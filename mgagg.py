@@ -13,8 +13,21 @@ import numpy as np
 from transformers import pipeline as hf_pipeline
 import re
 
-# 🔹 Load data
-nlp = spacy.load("en_core_web_sm")
+import spacy
+import subprocess
+import sys
+
+def ensure_spacy_model():
+    try:
+        nlp = spacy.load("en_core_web_sm")
+        return nlp
+    except OSError:
+        print("Downloading spaCy model...")
+        subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
+        return spacy.load("en_core_web_sm")
+
+nlp = ensure_spacy_model()
+
 df = pd.read_csv("micro_agg.csv", encoding='ISO-8859-1')
 df['ptext'] = df['speech'].apply(lambda x: " ".join(
     [token.lemma_ for token in nlp(x.lower()) if not token.is_stop and not token.is_punct]))
@@ -28,7 +41,6 @@ class SpacyPreprocessor(BaseEstimator, TransformerMixin):
     def transform(self, X):
         return [" ".join([token.lemma_ for token in nlp(text.lower()) if not token.is_punct]) for text in X]
 
-# 🔹 Train model
 pipeline = Pipeline([
     ('spacy', SpacyPreprocessor()),
     ('tfidf', TfidfVectorizer(ngram_range=(1, 2), min_df=1, max_df=0.95, sublinear_tf=True)),
@@ -41,7 +53,6 @@ y_pred = pipeline.predict(X_test)
 print(classification_report(y_test, y_pred))
 print("Accuracy:", accuracy_score(y_test, y_pred))
 
-# 🔹 RAG Embedding Setup
 kb_df = pd.read_csv("rag_kb.csv", encoding='ISO-8859-1')
 kb = kb_df['explanation'].dropna().tolist()
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
@@ -49,10 +60,9 @@ kb_embeddings = embedder.encode(kb)
 index = faiss.IndexFlatL2(kb_embeddings.shape[1])
 index.add(kb_embeddings)
 
-# 🔹 Improved T5 Rephrasing Setup
 print("Loading T5 model for rephrasing...")
 try:
-    # Use T5-base which is better than T5-small for text generation
+  
     rephraser_pipeline = hf_pipeline(
         "text2text-generation",
         model="t5-base",
@@ -74,10 +84,9 @@ except Exception as e:
 
 def preprocess_for_rephrasing(text):
     """Preprocess text to make it more suitable for T5 rephrasing"""
-    # Remove extra spaces and normalize
+
     text = re.sub(r'\s+', ' ', text.strip())
     
-    # If it's a very short phrase, expand it slightly for better context
     if len(text.split()) <= 3:
         if '?' in text:
             return f"How can I ask about {text.replace('?', '')} in a more respectful way"
@@ -87,20 +96,17 @@ def preprocess_for_rephrasing(text):
     return text
 
 def generate_rephrasing(original):
-    # First, try rule-based rephrasing as it's more reliable for microaggressions
+
     rule_based_result = enhanced_rule_based_rephrasing(original)
     
-    # If rule-based found a good transformation, use it
     if rule_based_result and rule_based_result.lower() != original.lower():
-        # Check if it's not just a generic wrapper
+     
         generic_phrases = ["could you help me understand", "i'd like to understand", "consider rephrasing"]
         if not any(phrase in rule_based_result.lower() for phrase in generic_phrases):
             return rule_based_result
     
-    # Only try T5 if rule-based didn't work well
     if rephraser_pipeline is not None:
         try:
-            # Simpler, more direct prompts for T5
             simple_prompts = [
                 f"Question: {original} Answer:",
                 f"Rewrite: {original}",
@@ -124,7 +130,6 @@ def generate_rephrasing(original):
                     result = response[0]['generated_text'].strip()
                     cleaned_result = clean_generated_text(result)
                     
-                    # Check if the result is actually different and useful
                     if (cleaned_result and 
                         len(cleaned_result) > 5 and 
                         cleaned_result.lower() != original.lower() and
@@ -137,35 +142,30 @@ def generate_rephrasing(original):
         except Exception as e:
             print(f"T5 rephrasing failed: {e}")
     
-    # Fallback to rule-based result (even if generic)
     return rule_based_result if rule_based_result else f"Could you rephrase this more respectfully: {original}"
 
 def clean_generated_text(text):
     """Clean up the generated text"""
     import re
     
-    # Remove common T5 artifacts and prompts
     text = re.sub(r'^(rephrase|rewrite|improve|make this more inclusive|question|answer):\s*', '', text, flags=re.IGNORECASE)
     text = re.sub(r'^(.*?)(rephrase|rewrite|improve|make this more inclusive|question|answer):\s*', '', text, flags=re.IGNORECASE)
     
-    # Remove repeated phrases
+    
     parts = text.split()
     if len(parts) > 6:
-        # Check for repetition in the middle
+      
         mid = len(parts) // 2
         first_half = ' '.join(parts[:mid])
         second_half = ' '.join(parts[mid:])
         if first_half.lower() == second_half.lower():
             text = first_half
     
-    # Clean up spacing
     text = re.sub(r'\s+', ' ', text.strip())
     
-    # Ensure proper capitalization
     if text and not text[0].isupper():
         text = text[0].upper() + text[1:]
     
-    # Ensure proper punctuation
     if text and text[-1] not in '.!?':
         text += '?'
     
@@ -177,9 +177,8 @@ def enhanced_rule_based_rephrasing(original):
         text = original.strip()
         lower_text = text.lower()
         
-        # Enhanced respectful transformations
         respectful_patterns = {
-            # Question patterns
+       
             r'\bwomen do\b': 'What is the involvement of women in',
             r'\bcan women\b': 'What are women\'s capabilities regarding',
             r'\bdo women\b': 'What is women\'s experience with',
@@ -187,12 +186,10 @@ def enhanced_rule_based_rephrasing(original):
             r'\bwhy don\'t women\b': 'What factors might influence women\'s participation in',
             r'\bwhy can\'t women\b': 'What are the barriers women face in',
             
-            # Problematic phrases
             r'\byou people\b': 'individuals from diverse backgrounds',
             r'\byour kind\b': 'people in similar situations',
             r'\bthose people\b': 'individuals from that community',
-            
-            # Assumptions
+           
             r'\bwomen don\'t\b': 'some women may not',
             r'\bwomen can\'t\b': 'there may be barriers preventing women from',
             r'\bwomen aren\'t\b': 'women may not always be',
@@ -202,19 +199,16 @@ def enhanced_rule_based_rephrasing(original):
         for pattern, replacement in respectful_patterns.items():
             rephrased = re.sub(pattern, replacement, rephrased, flags=re.IGNORECASE)
         
-        # If we made changes, clean up the result
         if rephrased != text:
-            # Ensure it's a proper question if it was originally
+      
             if '?' in original and '?' not in rephrased:
                 rephrased += '?'
             
-            # Proper capitalization
             if rephrased and not rephrased[0].isupper():
                 rephrased = rephrased[0].upper() + rephrased[1:]
             
             return rephrased
         
-        # If no specific pattern matched, create a more inclusive version
         if '?' in text:
             return f"I'd like to understand more about {text.replace('?', '').strip()}. Could you help me learn about this?"
         else:
@@ -233,7 +227,6 @@ def classify_and_explain(text):
     else:
         return "Not a microaggression", None
 
-# 🔹 Run test predictions with multiple examples
 test_samples = [
     "Women do ML?"
 ]
@@ -255,6 +248,5 @@ for sample_text in test_samples:
         print("No rephrasing needed as it's not a microaggression.")
     print("-" * 40)
 
-# 🔹 Save model
 joblib.dump(pipeline, "microagg_model.pkl")
 print("\nModel saved successfully!")
