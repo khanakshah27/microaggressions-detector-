@@ -1,5 +1,6 @@
 import pandas as pd
-import spacy
+from textblob import TextBlob
+import nltk
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
@@ -12,26 +13,79 @@ import faiss
 import numpy as np
 from transformers import pipeline as hf_pipeline
 import re
+import string
 
-import spacy
+try:
+    nltk.download('punkt', quiet=True)
+    nltk.download('stopwords', quiet=True)
+    nltk.download('averaged_perceptron_tagger', quiet=True)
+    nltk.download('wordnet', quiet=True)
+    nltk.download('omw-1.4', quiet=True)
+except:
+    pass
 
-nlp = spacy.load("en_core_web_sm")
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+lemmatizer = WordNetLemmatizer()
+stop_words = set(stopwords.words('english'))
+
+def preprocess_text_textblob(text):
+    """Preprocess text using TextBlob and NLTK - equivalent to spaCy preprocessing"""
+    try:
+    
+        text = text.lower()
+        
+        text = text.translate(str.maketrans('', '', string.punctuation))
+        
+        blob = TextBlob(text)
+        
+        processed_tokens = []
+        for word in blob.words:
+            if word not in stop_words and len(word) > 1:
+                lemmatized = lemmatizer.lemmatize(word)
+                processed_tokens.append(lemmatized)
+        
+        return " ".join(processed_tokens)
+    except:
+        return text.lower()
 
 df = pd.read_csv("micro_agg.csv", encoding='ISO-8859-1')
-df['ptext'] = df['speech'].apply(lambda x: " ".join(
-    [token.lemma_ for token in nlp(x.lower()) if not token.is_stop and not token.is_punct]))
+df['ptext'] = df['speech'].apply(preprocess_text_textblob)
 
 X = df['speech']
 y = df['label']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-class SpacyPreprocessor(BaseEstimator, TransformerMixin):
-    def fit(self, X, y=None): return self
+class TextBlobPreprocessor(BaseEstimator, TransformerMixin):
+    """Custom preprocessor using TextBlob instead of spaCy"""
+    def fit(self, X, y=None): 
+        return self
+    
     def transform(self, X):
-        return [" ".join([token.lemma_ for token in nlp(text.lower()) if not token.is_punct]) for text in X]
+        processed_texts = []
+        for text in X:
+            try:
+                text = text.lower()
+                text = text.translate(str.maketrans('', '', string.punctuation))
+                
+              
+                blob = TextBlob(text)
+                
+                tokens = []
+                for word in blob.words:
+                    if len(word) > 1:  # Remove single characters
+                        lemmatized = lemmatizer.lemmatize(word)
+                        tokens.append(lemmatized)
+                
+                processed_texts.append(" ".join(tokens))
+            except:
+                processed_texts.append(text.lower())
+        
+        return processed_texts
 
 pipeline = Pipeline([
-    ('spacy', SpacyPreprocessor()),
+    ('textblob', TextBlobPreprocessor()),
     ('tfidf', TfidfVectorizer(ngram_range=(1, 2), min_df=1, max_df=0.95, sublinear_tf=True)),
     ('sgd', SGDClassifier(loss='log_loss', penalty='elasticnet', alpha=1e-5,
     max_iter=1000, class_weight='balanced', random_state=42))
@@ -51,7 +105,6 @@ index.add(kb_embeddings)
 
 print("Loading T5 model for rephrasing...")
 try:
-  
     rephraser_pipeline = hf_pipeline(
         "text2text-generation",
         model="t5-base",
@@ -73,7 +126,6 @@ except Exception as e:
 
 def preprocess_for_rephrasing(text):
     """Preprocess text to make it more suitable for T5 rephrasing"""
-
     text = re.sub(r'\s+', ' ', text.strip())
     
     if len(text.split()) <= 3:
@@ -85,11 +137,9 @@ def preprocess_for_rephrasing(text):
     return text
 
 def generate_rephrasing(original):
-
     rule_based_result = enhanced_rule_based_rephrasing(original)
     
     if rule_based_result and rule_based_result.lower() != original.lower():
-     
         generic_phrases = ["could you help me understand", "i'd like to understand", "consider rephrasing"]
         if not any(phrase in rule_based_result.lower() for phrase in generic_phrases):
             return rule_based_result
@@ -140,10 +190,8 @@ def clean_generated_text(text):
     text = re.sub(r'^(rephrase|rewrite|improve|make this more inclusive|question|answer):\s*', '', text, flags=re.IGNORECASE)
     text = re.sub(r'^(.*?)(rephrase|rewrite|improve|make this more inclusive|question|answer):\s*', '', text, flags=re.IGNORECASE)
     
-    
     parts = text.split()
     if len(parts) > 6:
-      
         mid = len(parts) // 2
         first_half = ' '.join(parts[:mid])
         second_half = ' '.join(parts[mid:])
@@ -167,18 +215,15 @@ def enhanced_rule_based_rephrasing(original):
         lower_text = text.lower()
         
         respectful_patterns = {
-       
             r'\bwomen do\b': 'What is the involvement of women in',
             r'\bcan women\b': 'What are women\'s capabilities regarding',
             r'\bdo women\b': 'What is women\'s experience with',
             r'\bgirls and\b': 'What about female participation in',
             r'\bwhy don\'t women\b': 'What factors might influence women\'s participation in',
             r'\bwhy can\'t women\b': 'What are the barriers women face in',
-            
             r'\byou people\b': 'individuals from diverse backgrounds',
             r'\byour kind\b': 'people in similar situations',
             r'\bthose people\b': 'individuals from that community',
-           
             r'\bwomen don\'t\b': 'some women may not',
             r'\bwomen can\'t\b': 'there may be barriers preventing women from',
             r'\bwomen aren\'t\b': 'women may not always be',
@@ -189,7 +234,6 @@ def enhanced_rule_based_rephrasing(original):
             rephrased = re.sub(pattern, replacement, rephrased, flags=re.IGNORECASE)
         
         if rephrased != text:
-      
             if '?' in original and '?' not in rephrased:
                 rephrased += '?'
             
@@ -216,6 +260,7 @@ def classify_and_explain(text):
     else:
         return "Not a microaggression", None
 
+# Test samples
 test_samples = [
     "Women do ML?"
 ]
@@ -237,5 +282,6 @@ for sample_text in test_samples:
         print("No rephrasing needed as it's not a microaggression.")
     print("-" * 40)
 
+# Save the model
 joblib.dump(pipeline, "microagg_model.pkl")
 print("\nModel saved successfully!")
