@@ -14,19 +14,8 @@ from transformers import pipeline as hf_pipeline
 import re
 
 import spacy
-import subprocess
-import sys
 
-def ensure_spacy_model():
-    try:
-        nlp = spacy.load("en_core_web_sm")
-        return nlp
-    except OSError:
-        print("Downloading spaCy model...")
-        subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"])
-        return spacy.load("en_core_web_sm")
-
-nlp = ensure_spacy_model()
+nlp = spacy.load("en_core_web_sm")
 
 df = pd.read_csv("micro_agg.csv", encoding='ISO-8859-1')
 df['ptext'] = df['speech'].apply(lambda x: " ".join(
