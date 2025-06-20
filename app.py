@@ -1,6 +1,7 @@
 import streamlit as st
 from mgagg import classify_and_explain, generate_rephrasing
 
+
 st.title("Microaggression Classifier & Rephraser")
 
 user_input = st.text_area("Enter a sentence")
