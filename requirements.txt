@@ -1,9 +1,10 @@
 streamlit
+textblob
+nltk
 scikit-learn
 pandas
-spacy
 sentence-transformers
 faiss-cpu
 transformers
 joblib
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.4.1/en_core_web_sm-3.4.1.tar.gz
+blis==0.7.9
