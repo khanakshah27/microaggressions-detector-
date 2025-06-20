@@ -1,10 +1,10 @@
-streamlit
+pandas
+scikit-learn
 textblob
 nltk
-scikit-learn
-pandas
 sentence-transformers
 faiss-cpu
 transformers
 joblib
 blis==0.7.9
+streamlit
