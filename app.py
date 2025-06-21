@@ -1,7 +1,7 @@
 # app.py
 
 import streamlit as st
-from microagg import (
+from mgagg import (
     load_pipeline,
     load_kb_embedder_faiss,
     load_rephraser,
