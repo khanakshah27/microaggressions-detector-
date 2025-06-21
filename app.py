@@ -1,27 +1,31 @@
+# app.py
+
 import streamlit as st
-from mgagg import classify_and_explain, generate_rephrasing
+from microagg import (
+    load_pipeline,
+    load_kb_embedder_faiss,
+    load_rephraser,
+    classify_and_explain,
+    generate_rephrasing
+)
 
-st.set_page_config(page_title="Microaggression Detector", layout="centered")
+st.set_page_config(page_title="Microaggression Rephraser", layout="centered")
+st.title("🧠 Microaggression Detector & Rephraser")
 
-st.title("🧠 Microaggression Classifier & Rephraser")
-st.markdown("Detect whether a sentence contains a microaggression and suggest a respectful alternative.")
+user_input = st.text_area("✍️ Enter your sentence:")
 
-user_input = st.text_area("Enter a sentence:")
+if st.button("🔍 Analyze") and user_input:
+    with st.spinner("Classifying and generating response..."):
+        pipeline = load_pipeline()
+        kb, embedder, index = load_kb_embedder_faiss()
+        rephraser_pipeline = load_rephraser()
 
-if st.button("Analyze"):
-    if user_input.strip() == "":
-        st.warning("Please enter a sentence.")
-    else:
-        label, explanation = classify_and_explain(user_input)
-        st.subheader("Prediction:")
-        st.write(f"**{label}**")
+        label, explanation = classify_and_explain(user_input, pipeline, embedder, kb, index)
+        st.subheader(f"Prediction: {label}")
 
-        if explanation:
-            st.subheader("Explanation:")
-            st.write(explanation)
-
-            rephrased = generate_rephrasing(user_input)
-            st.subheader("Suggested Rephrasing:")
-            st.success(rephrased)
+        if label == "Microaggression":
+            st.write(f"**Explanation:** {explanation}")
+            rephrased = generate_rephrasing(user_input, rephraser_pipeline)
+            st.write(f"**Suggested Rephrasing:** {rephrased}")
         else:
-            st.info("No rephrasing needed.")
+            st.success("✅ This sentence is not considered a microaggression.")
