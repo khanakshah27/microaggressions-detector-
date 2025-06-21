@@ -1,4 +1,3 @@
-# microagg.py
 
 import pandas as pd
 import numpy as np
@@ -13,11 +12,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import joblib
 from sentence_transformers import SentenceTransformer
 import faiss
-from transformers import pipeline as hf_pipeline
 import re
 import string
+import os
+import streamlit as st
+import google.generativeai as genai
 
-# Downloads
 nltk.download('punkt', quiet=True)
 nltk.download('stopwords', quiet=True)
 nltk.download('averaged_perceptron_tagger', quiet=True)
@@ -74,44 +74,40 @@ def load_kb_embedder_faiss():
     index.add(kb_embeddings)
     return kb, embedder, index
 
-def load_rephraser():
+def get_gemini_api_key():
     try:
-        return hf_pipeline("text2text-generation", model="t5-base", tokenizer="t5-base")
-    except:
-        try:
-            return hf_pipeline("text2text-generation", model="t5-small", tokenizer="t5-small")
-        except:
-            return None
+        return st.secrets["GEMINI_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            st.error("GEMINI_API_KEY not found.")
+            st.stop()
+        return api_key
 
+genai.configure(api_key=get_gemini_api_key())
+model = genai.GenerativeModel("models/gemini-1.5-flash")  
 def enhanced_rule_based_rephrasing(original):
     text = original.strip()
     patterns = {
         r'\bwomen do\b': 'What is the involvement of women in',
-        r'\bcan women\b': 'What are women\'s capabilities regarding',
-        r'\bdo women\b': 'What is women\'s experience with',
+        r'\bcan women\b': 'What are women's capabilities regarding',
+        r'\bdo women\b': 'What is women's experience with',
         r'\bgirls and\b': 'What about female participation in',
-        r'\bwhy don\'t women\b': 'What factors might influence women\'s participation in',
-        r'\bwhy can\'t women\b': 'What are the barriers women face in',
+        r'\bwhy don't women\b': 'What factors might influence women's participation in',
+        r'\bwhy can't women\b': 'What are the barriers women face in',
         r'\byou people\b': 'individuals from diverse backgrounds',
         r'\byour kind\b': 'people in similar situations',
         r'\bthose people\b': 'individuals from that community',
-        r'\bwomen don\'t\b': 'some women may not',
-        r'\bwomen can\'t\b': 'there may be barriers preventing women from',
-        r'\bwomen aren\'t\b': 'women may not always be',
+        r'\bwomen don't\b': 'some women may not',
+        r'\bwomen can't\b': 'there may be barriers preventing women from',
+        r'\bwomen aren't\b': 'women may not always be',
     }
-
-    rephrased = text
     for pattern, replacement in patterns.items():
-        rephrased = re.sub(pattern, replacement, rephrased, flags=re.IGNORECASE)
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-    if rephrased != text:
-        if '?' in text and '?' not in rephrased:
-            rephrased += '?'
-        return rephrased[0].upper() + rephrased[1:]
-
-    if '?' in text:
-        return f"I'd like to understand more about {text.replace('?', '')}. Could you help me?"
-    return f"Could you help me understand: {text}?"
+    if '?' in text and '?' not in replacement:
+        text += '?'
+    return text[0].upper() + text[1:] if text else original
 
 def clean_generated_text(text):
     text = re.sub(r'^(rephrase|rewrite|question|answer):\s*', '', text, flags=re.IGNORECASE)
@@ -122,19 +118,13 @@ def clean_generated_text(text):
         text += '.'
     return text
 
-def generate_rephrasing(text, rephraser_pipeline):
-    rule_based = enhanced_rule_based_rephrasing(text)
-    if rephraser_pipeline:
-        try:
-            prompts = [f"Rewrite: {text}", f"Improve: {text}"]
-            for prompt in prompts:
-                response = rephraser_pipeline(prompt, max_length=50, num_return_sequences=1)
-                result = clean_generated_text(response[0]['generated_text'])
-                if result.lower() != text.lower():
-                    return result
-        except:
-            pass
-    return rule_based
+def generate_rephrasing(text):
+    try:
+        prompt = f"Rewrite this more respectfully: {text}"
+        response = model.generate_content(prompt)
+        return clean_generated_text(response.text)
+    except Exception:
+        return enhanced_rule_based_rephrasing(text)
 
 def classify_and_explain(text, pipeline, embedder, kb, index):
     prediction = pipeline.predict([text])[0]
