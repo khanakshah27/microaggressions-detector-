@@ -103,12 +103,12 @@ patterns = {
     r'\bwomen aren\'t\b': "women may not always be",
 }
 
-    for pattern, replacement in patterns.items():
+for pattern, replacement in patterns.items():
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-    if '?' in text and '?' not in replacement:
+if '?' in text and '?' not in replacement:
         text += '?'
-    return text[0].upper() + text[1:] if text else original
+return text[0].upper() + text[1:] if text else original
 
 def clean_generated_text(text):
     text = re.sub(r'^(rephrase|rewrite|question|answer):\s*', '', text, flags=re.IGNORECASE)
