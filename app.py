@@ -4,7 +4,6 @@ import streamlit as st
 from mgagg import (
     load_pipeline,
     load_kb_embedder_faiss,
-    load_rephraser,
     classify_and_explain,
     generate_rephrasing
 )
