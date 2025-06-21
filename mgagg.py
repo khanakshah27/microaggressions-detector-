@@ -88,7 +88,7 @@ genai.configure(api_key=get_gemini_api_key())
 model = genai.GenerativeModel("models/gemini-2.5-flash")  
 def enhanced_rule_based_rephrasing(original):
     text = original.strip()
-patterns = {
+    patterns = {
     r'\bwomen do\b': "What is the involvement of women in",
     r'\bcan women\b': "What are women's capabilities regarding",
     r'\bdo women\b': "What is women's experience with",
@@ -101,14 +101,14 @@ patterns = {
     r'\bwomen don\'t\b': "some women may not",
     r'\bwomen can\'t\b': "there may be barriers preventing women from",
     r'\bwomen aren\'t\b': "women may not always be",
-}
+    }
 
-for pattern, replacement in patterns.items():
+    for pattern, replacement in patterns.items():
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
-if '?' in text and '?' not in replacement:
+    if '?' in text and '?' not in replacement:
         text += '?'
-return text[0].upper() + text[1:] if text else original
+    return text[0].upper() + text[1:] if text else original
 
 def clean_generated_text(text):
     text = re.sub(r'^(rephrase|rewrite|question|answer):\s*', '', text, flags=re.IGNORECASE)
