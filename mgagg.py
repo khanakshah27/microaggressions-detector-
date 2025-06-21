@@ -88,20 +88,21 @@ genai.configure(api_key=get_gemini_api_key())
 model = genai.GenerativeModel("models/gemini-2.5-flash")  
 def enhanced_rule_based_rephrasing(original):
     text = original.strip()
-    patterns = {
-        r'\bwomen do\b': 'What is the involvement of women in',
-        r'\bcan women\b': 'What are women's capabilities regarding',
-        r'\bdo women\b': 'What is women's experience with',
-        r'\bgirls and\b': 'What about female participation in',
-        r'\bwhy don't women\b': 'What factors might influence women's participation in',
-        r'\bwhy can't women\b': 'What are the barriers women face in',
-        r'\byou people\b': 'individuals from diverse backgrounds',
-        r'\byour kind\b': 'people in similar situations',
-        r'\bthose people\b': 'individuals from that community',
-        r'\bwomen don't\b': 'some women may not',
-        r'\bwomen can't\b': 'there may be barriers preventing women from',
-        r'\bwomen aren't\b': 'women may not always be',
-    }
+patterns = {
+    r'\bwomen do\b': "What is the involvement of women in",
+    r'\bcan women\b': "What are women's capabilities regarding",
+    r'\bdo women\b': "What is women's experience with",
+    r'\bgirls and\b': "What about female participation in",
+    r'\bwhy don\'t women\b': "What factors might influence women's participation in",
+    r'\bwhy can\'t women\b': "What are the barriers women face in",
+    r'\byou people\b': "individuals from diverse backgrounds",
+    r'\byour kind\b': "people in similar situations",
+    r'\bthose people\b': "individuals from that community",
+    r'\bwomen don\'t\b': "some women may not",
+    r'\bwomen can\'t\b': "there may be barriers preventing women from",
+    r'\bwomen aren\'t\b': "women may not always be",
+}
+
     for pattern, replacement in patterns.items():
         text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
 
