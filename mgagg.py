@@ -136,3 +136,5 @@ def classify_and_explain(text, pipeline, embedder, kb, index):
         return "Microaggression", explanation
     return "Not a microaggression", None
 
+if __name__ == "__main__":
+    train_and_save_pipeline()
