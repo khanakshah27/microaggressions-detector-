@@ -85,7 +85,7 @@ def get_gemini_api_key():
         return api_key
 
 genai.configure(api_key=get_gemini_api_key())
-model = genai.GenerativeModel("models/gemini-1.5-flash")  
+model = genai.GenerativeModel("models/gemini-2.5-flash")  
 def enhanced_rule_based_rephrasing(original):
     text = original.strip()
     patterns = {
