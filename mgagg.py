@@ -283,5 +283,5 @@ for sample_text in test_samples:
     print("-" * 40)
 
 # Save the model
-joblib.dump(pipeline, "microagg_model.pkl")
+pipeline = joblib.load("microagg_model.pkl")
 print("\nModel saved successfully!")
